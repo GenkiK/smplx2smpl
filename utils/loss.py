@@ -15,57 +15,57 @@ def compute_geodesic_distance(
     eps: float = torch.finfo(torch.float32).eps,
 ) -> torch.Tensor:
     """
-    2つのSMPLポーズパラメータ間のGeodesic Distanceを計算します。
+    Compute the Geodesic Distance between two SMPL pose parameters.
 
     Args:
-        pose1 (torch.Tensor): 1つ目のポーズパラメータ。
-                              形状は (B, J, 3) の軸角度表現。
-        pose2 (torch.Tensor): 2つ目のポーズパラメータ。pose1と同じ形状。
-        reduction (str): 出力に適用するリダクション: 'none' | 'mean' | 'sum'。
-                         'sum': 全関節の距離の合計（デフォルト）
-                         'mean': 全関節の距離の平均
-                         'none': 各関節の距離をそのまま返す (B, J)
+        pose1 (torch.Tensor): The first pose parameter.
+                              Shape is (B, J, 3) in axis-angle representation.
+        pose2 (torch.Tensor): The second pose parameter. Same shape as pose1.
+        reduction (str): Reduction to apply to the output: 'none' | 'mean' | 'sum'.
+                         'sum': Sum of distances across all joints (default)
+                         'mean': Mean distance across all joints
+                         'none': Return distances for each joint as is (B, J)
 
     Returns:
-        torch.Tensor: 計算されたGeodesic Distance。
-                      reductionが 'none' の場合は形状 (B, J) のテンソル、
-                      それ以外の場合はスカラーテンソル。
+        torch.Tensor: Computed Geodesic Distance.
+                      If reduction is 'none', the shape is (B, J),
+                      otherwise it is a scalar tensor.
     """
-    assert pose1.shape == pose2.shape, "pose1とpose2の形状は一致する必要があります。"
-    assert pose1.ndim == 3, "入力テンソルは3次元でなければなりません。形状は (B, J, 3) です。"
+    assert pose1.shape == pose2.shape, "pose1 and pose2 must have the same shape."
+    assert pose1.ndim == 3, "Input tensors must be 3-dimensional with shape (B, J, 3)."
 
-    # バッチサイズ、関節数を取得
+    # Get batch size and number of joints
     B = pose1.shape[0]
 
-    # 軸角度表現を回転行列に変換
-    # (B, J * 3) -> (B * J, 3) に変形してから変換し、元の形状に戻す
+    # Convert axis-angle representation to rotation matrices
+    # Reshape (B, J * 3) -> (B * J, 3) for conversion, then reshape back
     R1 = axis_angle_to_matrix(pose1.view(-1, 3)).view(B, -1, 3, 3)
     R2 = axis_angle_to_matrix(pose2.view(-1, 3)).view(B, -1, 3, 3)
 
-    # 相対的な回転を計算
-    # torch.matmulはブロードキャストをサポートしているため、(B, J, 3, 3)のままでOK
+    # Compute relative rotation
+    # torch.matmul supports broadcasting, so (B, J, 3, 3) works directly
     dR = torch.matmul(R2, R1.transpose(-1, -2))
 
-    # 相対回転行列のトレースを計算
-    # einsumを使うと簡潔に書ける: '...ii->...' は対角成分の和を取る
-    traces = torch.einsum("...ii->...", dR)  # 形状: (B, J)
+    # Compute the trace of the relative rotation matrix
+    # Using einsum for simplicity: '...ii->...' sums diagonal elements
+    traces = torch.einsum("...ii->...", dR)  # Shape: (B, J)
 
-    # トレースから角度（Geodesic Distance）を計算
-    # acosの入力は[-1, 1]の範囲にある必要があるため、clampで数치誤差による範囲外の値を丸める
+    # Compute angle (Geodesic Distance) from the trace
+    # Clamp values to [-1, 1] to handle numerical errors
     cos_theta = (traces - 1) / 2.0
     cos_theta = torch.clamp(cos_theta, -1.0 + eps, 1.0 - eps)
-    theta = torch.acos(cos_theta)  # 形状: (B, J)
+    theta = torch.acos(cos_theta)  # Shape: (B, J)
 
-    # 近接角(theta ≒ 0)での勾配品質向上
-    # θ→0 では acos の勾配が 1/√(1−x²) ≈ 1/θ と発散 ⇒ Frobenius 近似に置き換え，滑らかな勾配を確保。
+    # Improve gradient quality for small angles (theta ≈ 0)
+    # For θ→0, the gradient of acos diverges as 1/√(1−x²) ≈ 1/θ ⇒ Replace with Frobenius approximation for smooth gradients.
     small = theta < 1e-4
     if small.any():
         A = 0.5 * (dR - dR.transpose(-1, -2))
-        # Frobenius norm は √2 θ + O(θ³)
+        # Frobenius norm is √2 θ + O(θ³)
         alt_theta = (A.square().sum((-2, -1)).sqrt()) / math.sqrt(2.0)
         theta = torch.where(small, alt_theta, theta)
 
-    # 指定されたリダクションを適用
+    # Apply the specified reduction
     if reduction == "sum":
         return torch.sum(theta)
     elif reduction == "mean":
@@ -73,7 +73,7 @@ def compute_geodesic_distance(
     elif reduction == "none":
         return theta
     else:
-        raise ValueError(f"無効なreductionタイプです: {reduction}")
+        raise ValueError(f"Invalid reduction type: {reduction}")
 
 
 def get_reduction_method(reduction="mean"):

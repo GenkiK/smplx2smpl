@@ -13,16 +13,16 @@ PELVIS_IDX = 0
 
 
 def count_consecutive_true(mask: torch.Tensor):
-    # Trueに対応する要素にはそのTrueが属する塊の大きさ，Falseに対応する要素には0が入ったテンソルを返す
+    # Returns a tensor where elements corresponding to True in the input contain the size of the True block they belong to, and elements corresponding to False contain 0.
 
-    diff = torch.diff(mask.int(), prepend=torch.tensor([0], dtype=torch.int32), append=torch.tensor([0], dtype=torch.int32))  # 端を追加して差分を取る
-    starts = torch.where(diff == 1)[0]  # True の開始位置
-    ends = torch.where(diff == -1)[0]  # True の終了位置
+    diff = torch.diff(mask.int(), prepend=torch.tensor([0], dtype=torch.int32), append=torch.tensor([0], dtype=torch.int32))
+    starts = torch.where(diff == 1)[0]  # Start positions of True blocks
+    ends = torch.where(diff == -1)[0]  # End positions of True blocks
 
-    # ブロードキャストを用いて True の塊のサイズを設定
-    indices = torch.arange(len(mask))[:, None]  # 配列のインデックス
-    mask = (indices >= starts) & (indices < ends)  # True の範囲をマスク
-    out = torch.sum(mask * (ends - starts), dim=1)  # 塊のサイズを適用
+    # Use broadcasting to set the size of True blocks
+    indices = torch.arange(len(mask))[:, None]  # Array indices
+    mask = (indices >= starts) & (indices < ends)  # Mask for True ranges
+    out = torch.sum(mask * (ends - starts), dim=1)  # Apply block sizes
     return out
 
 
@@ -35,15 +35,13 @@ def smoothen(
     thresh: float = 0.2,
     thresh_betas: float = 5,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    # smplifyx.smoothen.smoothen_dataと基本的に同じだが，pose_embeddingを受け取らない（代わりにbetas, pose）・jointがopenposeを仮定しないという違いがある．
-
     # b_transl: [bs, 3]
     # b_global_orient: [bs, 3]
     # b_joints: [bs, 24, 3]
     # b_pose: [bs, 23, 3]
     # b_betas: [bs, 10]
 
-    # 1. jointsを見て動作の滑らかさを見て異常値を決定する
+    # 1. Determine outliers based on the smoothness of motion observed in joints
     bs = b_joints.shape[0]
     b_outlier_mask = torch.zeros(bs, dtype=torch.bool)
     b_pelvis_outlier_mask = torch.zeros(bs, dtype=torch.bool)
@@ -53,42 +51,42 @@ def smoothen(
     b_outlier_mask[1:-1] = (b_acc_norm > thresh).sum(-1) > 0
     b_pelvis_outlier_mask[1:-1] = b_acc_norm[:, PELVIS_IDX] > thresh
 
-    # 1.5. b_betasの変化量が大きい場合も異常値とする
+    # 1.5. Also consider large changes in b_betas as outliers
     b_betas_vel_norm = torch.norm(b_betas[1:] - b_betas[:-1], dim=-1)  # [bs-1, n_betas] -> [bs-1]
-    ## 末尾が異常だとnext_idxsがout of rangeになるので，末尾は考慮しない．次にwindowに任せる
+    # If the last frame is an outlier, next_idxs will go out of range, so exclude the last frame.
     b_outlier_mask[1:-1] = torch.logical_or(b_betas_vel_norm > thresh_betas, b_outlier_mask[1:])[:-1]  # [bs-2]
 
     if (~b_outlier_mask).all():
         return b_transl, b_global_orient, b_pose, b_betas
 
-    # b_outlier_maskはTrueが連続している可能性もある
+    # b_outlier_mask may have consecutive True values
     head_outlier_idxs = torch.where(torch.diff(b_outlier_mask.int()) == 1)[0] + 1
     n_consecutive_outliers = count_consecutive_true(b_outlier_mask)[head_outlier_idxs]
     prev_idxs = head_outlier_idxs - 1
     next_idxs = head_outlier_idxs + n_consecutive_outliers
     b_inlier_mask = ~b_outlier_mask
 
-    # 2. b_translを線形補間
+    # 2. Linearly interpolate b_transl
     b_transl_cp = b_transl.clone()
     b_transl_cp[b_outlier_mask] = torch.repeat_interleave((b_transl[prev_idxs] + b_transl[next_idxs]) / 2, repeats=n_consecutive_outliers, dim=0)
-    # root jointが異常でなければ補間しない．実際は元に戻している
+    # Do not interpolate if the root joint is not an outlier. In practice, revert to the original.
     b_transl_cp[~b_pelvis_outlier_mask] = b_transl[~b_pelvis_outlier_mask]
     b_transl = b_transl_cp
 
-    # 3. b_global_orientをslerpで補間
+    # 3. Interpolate b_global_orient using slerp
     b_inlier_idxs_np = torch.where(b_inlier_mask)[0].float().numpy()
     b_global_orient_inlier_scipy = R.from_rotvec(b_global_orient[b_inlier_mask].float())
     slerp = Slerp(b_inlier_idxs_np, b_global_orient_inlier_scipy)
     b_global_orient[b_outlier_mask] = torch.from_numpy(slerp(torch.where(b_outlier_mask)[0].float().numpy()).as_rotvec().astype(np.float32))
 
-    # 4. b_poseをslerpで補間
+    # 4. Interpolate b_pose using slerp
     n_pose_params = b_pose.shape[1]
     for pose_idx in range(n_pose_params):
         b_pose_inlier_scipy = R.from_rotvec(b_pose[b_inlier_mask, pose_idx, :].float())
         slerp = Slerp(b_inlier_idxs_np, b_pose_inlier_scipy)
         b_pose[b_outlier_mask, pose_idx, :] = torch.from_numpy(slerp(torch.where(b_outlier_mask)[0].float().numpy()).as_rotvec().astype(np.float32))
 
-    # 5. b_betasを平均値で補間
+    # 5. Interpolate b_betas using the mean value
     b_betas[b_outlier_mask] = b_betas[b_inlier_mask].mean(dim=0)
     return b_transl, b_global_orient, b_pose, b_betas
 
@@ -117,7 +115,7 @@ def main(
         window_interp_smpl_arr = np.empty((window_size, 85), dtype=np.float32)
         for i, frame_idx in enumerate(window_idxs):
             if (tgt_dir / f"{frame_idx:010d}.npz").exists():
-                # すでにスムージング済みのフレームはスキップ
+                # Skip frames that have already been smoothed
                 interp_smpl_path = tgt_dir / f"{frame_idx:010d}.npz"
             else:
                 interp_smpl_path = src_dir / f"{frame_idx:010d}.npz"
