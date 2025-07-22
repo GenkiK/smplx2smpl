@@ -86,7 +86,7 @@ def main(
         batch_size=1,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=False,
         drop_last=False,
         collate_fn=collate_fn,
     )
