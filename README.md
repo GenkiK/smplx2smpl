@@ -68,22 +68,25 @@ We provide example shell scripts for running each step of the pipeline. **Make s
 bash /path/to/smplx2smpl/scripts/per_frame.sh
 ```
 
-1. Interpolating NaNs
+2. Interpolating NaNs
 ```
 bash /path/to/smplx2smpl/scripts/interp_nan.sh
 ```
 
-1. Smoothing fitted data to remove outliers
+3. Smoothing fitted data to remove outliers
 ```
 bash /path/to/smplx2smpl/scripts/smoothen.sh
 ```
 
-1. Per-window fitting
+4. Per-window fitting
 ```
 bash /path/to/smplx2smpl/scripts/temporal_fit.sh
 ```
 
-1. (optional) Visualization
+5. (optional) Visualization
 ```
 bash /path/to/smplx2smpl/scripts/visualize.sh
 ```
+
+## Notes
+In per-window fitting, there are rare cases where the fitting of the first frame fails, causing all subsequent fittings to fail. Since PyTorch's LBFGS seems to include randomness, solving this issue is challenging. We strongly recommend visualizing the fitting process to check if it is successful, and if it fails, retrying the process.
