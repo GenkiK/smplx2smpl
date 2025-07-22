@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import numpy as np
 import smplx
@@ -172,7 +172,7 @@ def main(
 def build_temporal_closure(
     smpl_model: SMPL,
     var_dict: dict[str, torch.Tensor],
-    optimizer_dict,
+    optimizer_dict: dict[str, torch.optim.Optimizer | bool],
     gt_vertices: torch.Tensor,
     vertex_loss: nn.Module,
     params_to_opt: torch.Tensor | None = None,
@@ -299,7 +299,7 @@ def build_temporal_closure(
 
 
 def run_fitting(
-    exp_cfg,
+    exp_cfg: dict[str, Any],
     smplx_verts: torch.Tensor,
     smpl_model: SMPL,
     def_matrix: torch.Tensor,

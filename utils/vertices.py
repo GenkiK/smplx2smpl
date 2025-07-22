@@ -6,13 +6,10 @@ import scipy.sparse as sp
 import torch
 
 
-def apply_deformation_transfer(def_matrix: torch.Tensor, smplx_verts: torch.Tensor, use_normals: bool = False) -> torch.Tensor:
+def apply_deformation_transfer(def_matrix: torch.Tensor, smplx_verts: torch.Tensor) -> torch.Tensor:
     """Applies the deformation transfer on the given meshes"""
-    if use_normals:
-        raise NotImplementedError
-    else:
-        def_vertices = torch.einsum("mn,bni->bmi", [def_matrix, smplx_verts])
-        return def_vertices
+    deform_verts = torch.einsum("mn,bni->bmi", [def_matrix, smplx_verts])
+    return deform_verts
 
 
 def read_deformation_transfer(
@@ -44,15 +41,15 @@ def read_deformation_transfer(
     return torch.tensor(def_matrix, device=device, dtype=torch.float32)
 
 
-def row(A):
+def row(A: np.ndarray) -> np.ndarray:
     return A.reshape((1, -1))
 
 
-def col(A):
+def col(A: np.ndarray) -> np.ndarray:
     return A.reshape((-1, 1))
 
 
-def get_vert_connectivity(mesh_v, mesh_f):
+def get_vert_connectivity(mesh_v: np.ndarray, mesh_f: np.ndarray) -> sp.csc_matrix:
     """Returns a sparse matrix (of size #verts x #verts) where each nonzero
     element indicates a neighborhood relation. For example, if there is a
     nonzero element in position (15,12), that means vertex 15 is connected
@@ -72,7 +69,7 @@ def get_vert_connectivity(mesh_v, mesh_f):
     return vpv
 
 
-def get_vertices_per_edge(mesh_v, mesh_f):
+def get_vertices_per_edge(mesh_v: np.ndarray, mesh_f: np.ndarray) -> np.ndarray:
     """Returns an Ex2 array of adjacencies between vertices, where
     each element in the array is a vertex index. Each edge is included
     only once. If output of get_faces_per_edge is provided, this is used to

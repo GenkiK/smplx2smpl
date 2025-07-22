@@ -1,4 +1,7 @@
-def summary_closure(gt_vertices, var_dict, smpl_model):
+import torch
+from smplx.body_models import SMPL
+
+def summary_closure(gt_vertices: torch.Tensor, var_dict: dict[str, torch.Tensor], smpl_model: SMPL):
     model_output = smpl_model(return_full_pose=True, **var_dict)
     est_vertices = model_output.vertices
 

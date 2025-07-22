@@ -109,13 +109,11 @@ class VertexEdgeLoss(nn.Module):
         gt_edge_path="",
         est_edges=None,
         est_edge_path="",
-        robustifier=None,
-        edge_thresh=0.0,
         epsilon=1e-8,
         reduction="sum",
         **kwargs,
     ):
-        super(VertexEdgeLoss, self).__init__()
+        super().__init__()
 
         assert norm_type in ["l1", "l2"], "Norm type must be [l1, l2]"
         self.norm_type = norm_type
@@ -148,7 +146,7 @@ class VertexEdgeLoss(nn.Module):
         edge_points = torch.index_select(points, 1, connections.view(-1)).reshape(points.shape[0], -1, 2, 3)
         return edge_points[:, :, 1] - edge_points[:, :, 0]
 
-    def forward(self, gt_vertices, est_vertices, weights=None):
+    def forward(self, gt_vertices, est_vertices):
         gt_edges = self.compute_edges(gt_vertices, connections=self.gt_connections)
         est_edges = self.compute_edges(est_vertices, connections=self.est_connections)
 

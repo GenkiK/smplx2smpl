@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Any
 
 import numpy as np
 import smplx
@@ -149,7 +149,7 @@ def build_edge_closure(
     body_model: nn.Module,
     var_dict: dict[str, torch.Tensor],
     edge_loss: nn.Module,
-    optimizer_dict,
+    optimizer_dict: dict[str, torch.optim.Optimizer | bool],
     gt_vertices: torch.Tensor,
 ) -> Callable:
     """Builds the closure for the edge objective"""
@@ -182,7 +182,7 @@ def build_edge_closure(
 def build_vertex_closure(
     body_model: nn.Module,
     var_dict: dict[str, torch.Tensor],
-    optimizer_dict,
+    optimizer_dict: dict[str, torch.optim.Optimizer | bool],
     gt_vertices: torch.Tensor,
     vertex_loss: nn.Module,
     params_to_opt: torch.Tensor | None = None,
@@ -228,7 +228,7 @@ def build_vertex_closure(
 
 
 def run_fitting(
-    exp_cfg,
+    exp_cfg: dict[str, Any],
     smplx_verts: torch.Tensor,
     smpl_model: SMPL,
     def_matrix: torch.Tensor,

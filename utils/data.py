@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def split_indices_with_overlap(seqlen: int, window_size: int, n_duplicated_frames: int):
+def split_indices_with_overlap(seqlen: int, window_size: int, n_duplicated_frames: int) -> np.ndarray:
     assert window_size > n_duplicated_frames, "window_size must be larger than n_duplicated_frames"
 
     step = window_size - n_duplicated_frames

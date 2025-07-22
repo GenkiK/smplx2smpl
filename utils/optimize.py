@@ -1,12 +1,11 @@
-from typing import Callable
+from typing import Callable, Any
 
-import numpy as np
 import torch
 from torch import optim
 from tqdm import tqdm
 
 
-def build_optimizer(parameters: list[torch.Tensor], optim_cfg: dict) -> dict:
+def build_optimizer(parameters: list[torch.Tensor], optim_cfg: dict[str, Any]) -> dict[str, torch.optim.Optimizer | bool]:
     """Creates the optimizer"""
     optim_type = optim_cfg.get("type", "sgd")
 
@@ -29,37 +28,22 @@ def build_optimizer(parameters: list[torch.Tensor], optim_cfg: dict) -> dict:
     return {"optimizer": optimizer, "create_graph": create_graph}
 
 
-def rel_change(prev_val, curr_val):
-    return (prev_val - curr_val) / max([np.abs(prev_val), np.abs(curr_val), 1])
+def rel_change(prev_val:float, curr_val:float):
+    return (prev_val - curr_val) / max([abs(prev_val), abs(curr_val), 1])
 
 
 def minimize(
-    optimizer: torch.optim,
-    closure,
+    optimizer: torch.optim.Optimizer,
+    closure: Callable[[bool], torch.Tensor],
     params: list[torch.Tensor],
     summary_closure: Callable[[], dict[str, float]] | None = None,
-    maxiters=100,
-    ftol=-1.0,
-    gtol=1e-9,
-    verbose=True,
-    summary_steps=10,
+    maxiters: int=100,
+    ftol: float=-1.0,
+    gtol: float=1e-9,
+    verbose: bool=True,
+    summary_steps: int=10,
     **kwargs,
 ):
-    """Helper function for running an optimization process
-    Args:
-        - optimizer: The PyTorch optimizer object
-        - closure: The function used to calculate the gradients
-        - params: a list containing the parameters that will be optimized
-    Keyword arguments:
-        - maxiters (100): The maximum number of iterations for the
-          optimizer
-        - ftol: The tolerance for the relative change in the loss
-          function.
-          If it is lower than this value, then the process stops
-        - gtol: The tolerance for the maximum change in the gradient.
-          If the maximum absolute values of the all gradient tensors
-          are less than this, then the process will stop.
-    """
     prev_loss = None
     for n in tqdm(range(maxiters), desc="Fitting iterations"):
         # for n in range(maxiters):

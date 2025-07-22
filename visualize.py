@@ -71,7 +71,7 @@ def main(
 def visualize_smplx(
     smplx_pose: dict[str, torch.Tensor],
     smplx_params: dict[str, torch.Tensor],
-    tgt_dir,
+    tgt_dir: Path,
     xmin: int,
     xmax: int,
     ymin: int,
@@ -141,7 +141,7 @@ def visualize_smplx(
 
 def visualize_smpl(
     src_dir: Path,
-    tgt_dir,
+    tgt_dir: Path,
     xmin: int,
     xmax: int,
     ymin: int,
