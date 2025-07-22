@@ -1,6 +1,8 @@
 # smplx2smpl
 Convert SMPL-X to SMPL using optimization with temporal constraints. This repository provides an example implementation using the [ParaHome](https://github.com/snuvclab/ParaHome) dataset.
 
+<img src="./media/parahome_s1.gif" alt="parahome_s1.gif" width="60%"/>
+
 ## Description
 The `smplx` library provides basic functionality to convert SMPL-X models to SMPL, but it does not ensure temporal smoothness. While the LBFGS optimizer generally yields better results compared to optimizers like Adam, it can occasionally return NaNs.  
 This code addresses these issues by incorporating temporal continuity, interpolating NaN values, and producing smoother motion sequences.
