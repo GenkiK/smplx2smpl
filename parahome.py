@@ -47,8 +47,8 @@ class ParahomeDataset(data.Dataset):
         self.seqlen = len(self.seq_body_pose)
 
         # These values are used for visualization
-        self.xmin, self.ymin, self.zmin = self.seq_transl.amin(0)
-        self.xmax, self.ymax, self.zmax = self.seq_transl.amax(0)
+        self.xmin, self.ymin, self.zmin = [v.item() for v in self.seq_transl.amin(0)]
+        self.xmax, self.ymax, self.zmax = [v.item() for v in self.seq_transl.amax(0)]
 
     def __len__(self):
         return self.seqlen
